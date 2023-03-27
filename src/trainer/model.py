@@ -1,39 +1,18 @@
-import datetime
 import os
-import shutil
 import numpy as np
 import tensorflow as tf
-import hypertune
+from tensorflow import keras
+import tensorflow_hub as hub
 
-# Determine CSV, label, and key columns
-CSV_COLUMNS = [
-    "weight_pounds",
-    "is_male",
-    "mother_age",
-    "plurality",
-    "gestation_weeks",
-]
-LABEL_COLUMN = "weight_pounds"
+from tensorflow.keras.layers import (
+    Conv3D,
+    Dense,
+    Dropout,
+    Flatten,
+    MaxPooling3D,
+    Softmax
+)
 
-NUMERICAL_COLUMNS = ["mother_age", "gestation_weeks"]
-CATEGORICAL_COLUMNS = ["is_male", "plurality"]
-
-# Set default values for each CSV column.
-# Treat is_male and plurality as strings.
-DEFAULTS = [[0.0], ["null"], [0.0], ["null"], [0.0]]
-
-
-def features_and_labels(row_data):
-    """Splits features and labels from feature dictionary.
-
-    Args:
-        row_data: Dictionary of CSV column names and tensor values.
-    Returns:
-        Dictionary of feature tensors and label tensor.
-    """
-    label = row_data.pop(LABEL_COLUMN)
-
-    return row_data, label  # features, label
 
 
 def load_dataset(pattern, batch_size=1, mode=tf.estimator.ModeKeys.EVAL):
@@ -192,7 +171,7 @@ def rmse(y_true, y_pred):
     return tf.sqrt(tf.reduce_mean(tf.square(y_pred - y_true)))
 
 
-def build_wide_deep_model(dnn_hidden_units=[64, 32], nembeds=3):
+def build_wide_deep_model(dnn_hidden_units=[64, 32]):
     """Builds wide and deep model using Keras Functional API.
 
     Returns:

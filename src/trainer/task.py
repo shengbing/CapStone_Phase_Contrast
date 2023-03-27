@@ -10,18 +10,18 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--train_data_path",
-        help="GCS location of training data",
+        help="GCS location of training data, e.g., gs://capstone-datasets/train_3d.csv",
         required=True
     )
     parser.add_argument(
         "--eval_data_path",
-        help="GCS location of evaluation data",
+        help="GCS location of evaluation data, e.g., gs://capstone-datasets/valid_3d.csv",
         required=True
     )
     parser.add_argument(
         "--output_dir",
         help="GCS location to write checkpoints and export models",
-        default = os.getenv("AIP_MODEL_DIR")
+        default=os.getenv("AIP_MODEL_DIR")
     )
     parser.add_argument(
         "--batch_size",
@@ -32,13 +32,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--nnsize",
         help="Hidden layer sizes for DNN -- provide space-separated layers",
-        default="128 32 4"
-    )
-    parser.add_argument(
-        "--nembeds",
-        help="Embedding size of a cross of n key real-valued parameters",
-        type=int,
-        default=3
+        default="64 64"
     )
     parser.add_argument(
         "--num_epochs",
