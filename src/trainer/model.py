@@ -3,6 +3,7 @@ import numpy as np
 import tensorflow as tf
 from tensorflow import keras
 import tensorflow_hub as hub
+from tensorflow.keras.utils import to_categorical
 
 from tensorflow.keras.layers import (
     Conv3D,
@@ -13,37 +14,118 @@ from tensorflow.keras.layers import (
     Softmax
 )
 
+training_sample_dir = "/home/jupyter/asl-ml-immersion/notebooks/capstone_project/train-3d-npy"
+training_images = np.array([np.load(training_sample_dir + "/" + file) for file in  os.listdir(training_sample_dir)])
+
+training_labels = np.array([file.split("_")[4]  for file in  os.listdir(training_sample_dir)])
+
+labels_to_numeric = {
+    "Arterial": 0,
+    "Late": 1,
+    "Non-Contrast": 2,
+    "Venous": 3
+}
+
+numeric_to_labels = {
+    0:   "Arterial",
+    1:   "Late",
+    2:   "Non-Contrast",
+    3:  "Venous"
+}
+
+training_labels = np.array([labels_to_numeric[label]  for label in training_labels])
+one_hots_train = to_categorical(training_labels)
+def reshape_and_normalize(images):
+
+    ### START CODE HERE
+
+    # Reshape the images to add an extra dimension
+    images = images.reshape((images.shape[0], images.shape[1], images.shape[2], images.shape[3], 1))
+
+    # Normalize pixel values
+    max_value = np.max(images)
+    images = images/max_value
+
+    ### END CODE HERE
+
+    return images, max_value# Reload the images in case you run this cell multiple times
+
+# Reload the images in case you run this cell multiple times
+training_sample_dir = "/home/jupyter/asl-ml-immersion/notebooks/capstone_project/train-3d-npy"
+training_images = np.array([np.load(training_sample_dir + "/" + file) for file in os.listdir(training_sample_dir)])
+
+# Apply your function
+training_images, max_value = reshape_and_normalize(training_images)
+
+print(f"Maximum pixel value after normalization: {np.max(training_images)}\n")
+print(f"Shape of training set after reshaping: {training_images.shape}\n")
+print(f"Shape of one image after reshaping: {training_images[0].shape}")
 
 
-def load_dataset(pattern, batch_size=1, mode=tf.estimator.ModeKeys.EVAL):
-    """Loads dataset using the tf.data API from CSV files.
+class myCallback(tf.keras.callbacks.Callback):
+    # Define the method that checks the accuracy at the end of each epoch
+    def on_epoch_end(self, epoch, logs={}):
+        if logs.get('accuracy') > 0.995:
+            print("Reached 99.5% accuracy so cancelling training!")
+            self.model.stop_training = True
+            
 
-    Args:
-        pattern: str, file pattern to glob into list of files.
-        batch_size: int, the number of examples per batch.
-        mode: tf.estimator.ModeKeys to determine if training or evaluating.
-    Returns:
-        `Dataset` object.
-    """
-    # Make a CSV dataset
-    dataset = tf.data.experimental.make_csv_dataset(
-        file_pattern=pattern,
-        batch_size=batch_size,
-        column_names=CSV_COLUMNS,
-        column_defaults=DEFAULTS,
-    )
+callbacks = myCallback()
 
-    # Map dataset to features and label
-    dataset = dataset.map(map_func=features_and_labels)  # features, label
 
-    # Shuffle and repeat for training
-    if mode == tf.estimator.ModeKeys.TRAIN:
-        dataset = dataset.shuffle(buffer_size=1000).repeat()
+def convolutional_model():
+    ### START CODE HERE
 
-    # Take advantage of multi-threading; 1=AUTOTUNE
-    dataset = dataset.prefetch(buffer_size=1)
+    # Define the model
+    model = tf.keras.models.Sequential([
+        # hub.KerasLayer("https://tfhub.dev/google/HRNet/scannet-hrnetv2-w48/1", trainable=False),
+        # tf.keras.layers.Dropout(rate=0.2)
+        tf.keras.layers.Conv3D(16, 3, activation='relu',input_shape=training_images.shape[1:]),
+        tf.keras.layers.MaxPooling3D(pool_size=(2, 2,2), strides=(2, 2,2), padding='valid'),
+        tf.keras.layers.Conv3D(32, 3, activation='relu'),
+        tf.keras.layers.MaxPooling3D(pool_size=(2, 2,2), strides=(2, 2,2), padding='valid'),
+        tf.keras.layers.Flatten(),
+        tf.keras.layers.Dense(64, activation=tf.keras.activations.relu, kernel_regularizer=keras.regularizers.l2(l=0.1)),
+        tf.keras.layers.Dense(64, activation=tf.keras.activations.relu, kernel_regularizer=keras.regularizers.l2(l=0.1)),
+        tf.keras.layers.Dropout(rate=0.20),
+        tf.keras.layers.Dense(4),
+        tf.keras.layers.Softmax()
+    ])
+    ### END CODE HERE
 
-    return dataset
+    # Compile the model
+    model.compile(optimizer='adam',
+                  loss='categorical_crossentropy',
+                  metrics=['accuracy'])
+
+    return model
+
+
+model = convolutional_model()
+
+model.summary()
+
+
+# Reload the images in case you run this cell multiple times
+valid_sample_dir = "/home/jupyter/asl-ml-immersion/notebooks/capstone_project/valid-3d-npy"
+valid_images = np.array([np.load(valid_sample_dir + "/" + file)  for file in  os.listdir(valid_sample_dir)])
+
+# Apply your function
+valid_images, max_value = reshape_and_normalize(valid_images)
+
+print(f"Maximum pixel value after normalization: {np.max(valid_images)}\n")
+print(f"Shape of training set after reshaping: {valid_images.shape}\n")
+print(f"Shape of one image after reshaping: {valid_images[0].shape}")
+
+valid_labels = np.array([file.split("_")[4] for file in os.listdir(valid_sample_dir)])
+valid_labels = np.array([labels_to_numeric[label] for label in valid_labels])
+one_hots_valid = to_categorical(valid_labels)
+
+history = model.fit(x=training_images, y=one_hots_train, validation_data=(valid_images, one_hots_valid),
+                    epochs=40, callbacks=[callbacks])
+
+
+
 
 
 def create_input_layers():
@@ -69,106 +151,11 @@ def create_input_layers():
     return inputs
 
 
-def transform(inputs, nembeds):
-    """Creates dictionary of transformed inputs.
-
-    Returns:
-        Dictionary of transformed Tensors
-    """
-
-    deep = {}
-    wide = {}
-
-    buckets = {
-        "mother_age": np.arange(15, 45, 1).tolist(),
-        "gestation_weeks": np.arange(17, 47, 1).tolist(),
-    }
-    bucketized = {}
-
-    for numerical_column in NUMERICAL_COLUMNS:
-        deep[numerical_column] = inputs[numerical_column]
-        bucketized[numerical_column] = tf.keras.layers.Discretization(buckets[numerical_column])(inputs[numerical_column])
-        wide[f"btk_{numerical_column}"] = tf.keras.layers.CategoryEncoding(
-            num_tokens=len(buckets[numerical_column]) + 1, output_mode="one_hot"
-        )(bucketized[numerical_column])
-
-    crossed = tf.keras.layers.experimental.preprocessing.HashedCrossing(
-        num_bins=len(buckets["mother_age"]) * len(buckets["gestation_weeks"])
-    )((bucketized["mother_age"], bucketized["gestation_weeks"]))
-
-    deep["age_gestation_embeds"] = tf.keras.layers.Flatten()(
-        tf.keras.layers.Embedding(
-            input_dim=len(buckets["mother_age"])
-                      * len(buckets["gestation_weeks"]),
-            output_dim=nembeds,
-        )(crossed)
-    )
-
-    vocab = {
-        "is_male": ["True", "False", "Unknown"],
-        "plurality": [
-            "Single(1)",
-            "Twins(2)",
-            "Triplets(3)",
-            "Quadruplets(4)",
-            "Quintuplets(5)",
-            "Multiple(2+)",
-        ],
-    }
-
-    for categorical_column in CATEGORICAL_COLUMNS:
-        wide[categorical_column] = tf.keras.layers.StringLookup(
-            vocabulary=vocab[categorical_column], output_mode="one_hot"
-        )(inputs[categorical_column])
-
-    return wide, deep
-
-def get_model_outputs(wide_inputs, deep_inputs, dnn_hidden_units):
-    """Creates model architecture and returns outputs.
-
-    Args:
-        wide_inputs: Dense tensor used as inputs to wide side of model.
-        deep_inputs: Dense tensor used as inputs to deep side of model.
-        dnn_hidden_units: List of integers where length is number of hidden
-            layers and ith element is the number of neurons at ith layer.
-    Returns:
-        Dense tensor output from the model.
-    """
-    # Hidden layers for the deep side
-    layers = [int(x) for x in dnn_hidden_units.split()]
-    deep = deep_inputs
-    for layerno, numnodes in enumerate(layers):
-        deep = tf.keras.layers.Dense(
-            units=numnodes, activation="relu", name=f"dnn_{layerno + 1}"
-        )(deep)
-    deep_out = deep
-
-    # Linear model for the wide side
-    wide_out = tf.keras.layers.Dense(
-        units=10, activation="relu", name="linear"
-    )(wide_inputs)
-
-    # Concatenate the two sides
-    both = tf.keras.layers.Concatenate(name="both")([deep_out, wide_out])
-
-    # Final output is a linear activation because this is regression
-    output = tf.keras.layers.Dense(units=1, activation="linear", name="weight")(
-        both
-    )
-
-    return output
 
 
-def rmse(y_true, y_pred):
-    """Calculates RMSE evaluation metric.
 
-    Args:
-        y_true: tensor, true labels.
-        y_pred: tensor, predicted labels.
-    Returns:
-        Tensor with value of RMSE between true and predicted labels.
-    """
-    return tf.sqrt(tf.reduce_mean(tf.square(y_pred - y_true)))
+
+
 
 
 def build_wide_deep_model(dnn_hidden_units=[64, 32]):
