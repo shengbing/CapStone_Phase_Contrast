@@ -1,10 +1,13 @@
 import os
+import datetime
+import hypertune
 import numpy as np
 import tensorflow as tf
 from tensorflow import keras
 import tensorflow_hub as hub
 from tensorflow.keras.utils import to_categorical
-
+from io import BytesIO
+from tensorflow.python.lib.io import file_io
 from tensorflow.keras.layers import (
     Conv3D,
     Dense,
@@ -14,10 +17,7 @@ from tensorflow.keras.layers import (
     Softmax
 )
 
-training_sample_dir = "/home/jupyter/asl-ml-immersion/notebooks/capstone_project/train-3d-npy"
-training_images = np.array([np.load(training_sample_dir + "/" + file) for file in  os.listdir(training_sample_dir)])
 
-training_labels = np.array([file.split("_")[4]  for file in  os.listdir(training_sample_dir)])
 
 labels_to_numeric = {
     "Arterial": 0,
@@ -33,8 +33,7 @@ numeric_to_labels = {
     3:  "Venous"
 }
 
-training_labels = np.array([labels_to_numeric[label]  for label in training_labels])
-one_hots_train = to_categorical(training_labels)
+
 def reshape_and_normalize(images):
 
     ### START CODE HERE
@@ -50,16 +49,18 @@ def reshape_and_normalize(images):
 
     return images, max_value# Reload the images in case you run this cell multiple times
 
-# Reload the images in case you run this cell multiple times
-training_sample_dir = "/home/jupyter/asl-ml-immersion/notebooks/capstone_project/train-3d-npy"
-training_images = np.array([np.load(training_sample_dir + "/" + file) for file in os.listdir(training_sample_dir)])
 
-# Apply your function
-training_images, max_value = reshape_and_normalize(training_images)
+def load_and_format_data_from_gcs(sample_dir):
+    # sample_dir="gs://capstone-datasets/train_3d.csv"
+    file_list = file_io.read_file_to_string(sample_dir).split("\n")
+    images = np.array([np.load(BytesIO(file_io.read_file_to_string(file, binary_mode=True)))
+                       for file in file_list if file])
+    labels = np.array([os.path.basename(file).split("_")[4] for file in file_list if file])
+    labels = np.array([labels_to_numeric[label] for label in labels])
+    one_hots = to_categorical(labels)
 
-print(f"Maximum pixel value after normalization: {np.max(training_images)}\n")
-print(f"Shape of training set after reshaping: {training_images.shape}\n")
-print(f"Shape of one image after reshaping: {training_images[0].shape}")
+    images_tranformed, max_value = reshape_and_normalize(images)
+    return images_tranformed, one_hots
 
 
 class myCallback(tf.keras.callbacks.Callback):
@@ -70,24 +71,23 @@ class myCallback(tf.keras.callbacks.Callback):
             self.model.stop_training = True
             
 
-callbacks = myCallback()
-
-
-def convolutional_model():
+def convolutional_model(dropout_rate=0.2, l2_regularization_lambda=0.1, training_images_shape=(32, 128, 128, 1)):
     ### START CODE HERE
 
     # Define the model
     model = tf.keras.models.Sequential([
         # hub.KerasLayer("https://tfhub.dev/google/HRNet/scannet-hrnetv2-w48/1", trainable=False),
         # tf.keras.layers.Dropout(rate=0.2)
-        tf.keras.layers.Conv3D(16, 3, activation='relu',input_shape=training_images.shape[1:]),
-        tf.keras.layers.MaxPooling3D(pool_size=(2, 2,2), strides=(2, 2,2), padding='valid'),
+        tf.keras.layers.Conv3D(16, 3, activation='relu', input_shape=training_images_shape),
+        tf.keras.layers.MaxPooling3D(pool_size=(2, 2, 2), strides=(2, 2, 2), padding='valid'),
         tf.keras.layers.Conv3D(32, 3, activation='relu'),
-        tf.keras.layers.MaxPooling3D(pool_size=(2, 2,2), strides=(2, 2,2), padding='valid'),
+        tf.keras.layers.MaxPooling3D(pool_size=(2, 2, 2), strides=(2, 2, 2), padding='valid'),
         tf.keras.layers.Flatten(),
-        tf.keras.layers.Dense(64, activation=tf.keras.activations.relu, kernel_regularizer=keras.regularizers.l2(l=0.1)),
-        tf.keras.layers.Dense(64, activation=tf.keras.activations.relu, kernel_regularizer=keras.regularizers.l2(l=0.1)),
-        tf.keras.layers.Dropout(rate=0.20),
+        tf.keras.layers.Dense(64, activation=tf.keras.activations.relu,
+                              kernel_regularizer=keras.regularizers.l2(l=l2_regularization_lambda)),
+        tf.keras.layers.Dense(64, activation=tf.keras.activations.relu,
+                              kernel_regularizer=keras.regularizers.l2(l=l2_regularization_lambda)),
+        tf.keras.layers.Dropout(rate=dropout_rate),
         tf.keras.layers.Dense(4),
         tf.keras.layers.Softmax()
     ])
@@ -101,91 +101,9 @@ def convolutional_model():
     return model
 
 
-model = convolutional_model()
-
-model.summary()
-
-
-# Reload the images in case you run this cell multiple times
-valid_sample_dir = "/home/jupyter/asl-ml-immersion/notebooks/capstone_project/valid-3d-npy"
-valid_images = np.array([np.load(valid_sample_dir + "/" + file)  for file in  os.listdir(valid_sample_dir)])
-
-# Apply your function
-valid_images, max_value = reshape_and_normalize(valid_images)
-
-print(f"Maximum pixel value after normalization: {np.max(valid_images)}\n")
-print(f"Shape of training set after reshaping: {valid_images.shape}\n")
-print(f"Shape of one image after reshaping: {valid_images[0].shape}")
-
-valid_labels = np.array([file.split("_")[4] for file in os.listdir(valid_sample_dir)])
-valid_labels = np.array([labels_to_numeric[label] for label in valid_labels])
-one_hots_valid = to_categorical(valid_labels)
-
-history = model.fit(x=training_images, y=one_hots_train, validation_data=(valid_images, one_hots_valid),
-                    epochs=40, callbacks=[callbacks])
-
-
-
-
-
-def create_input_layers():
-    """Creates dictionary of input layers for each feature.
-
-    Returns:
-        Dictionary of `tf.Keras.layers.Input` layers for each feature.
-    """
-    deep_inputs = {
-        colname: tf.keras.layers.Input(
-            name=colname, shape=(1,), dtype="float32"
-        )
-        for colname in NUMERICAL_COLUMNS
-    }
-
-    wide_inputs = {
-        colname: tf.keras.layers.Input(name=colname, shape=(1,), dtype="string")
-        for colname in CATEGORICAL_COLUMNS
-    }
-
-    inputs = {**wide_inputs, **deep_inputs}
-
-    return inputs
-
-
-
-
-
-
-
-
-
-def build_wide_deep_model(dnn_hidden_units=[64, 32]):
-    """Builds wide and deep model using Keras Functional API.
-
-    Returns:
-        `tf.keras.models.Model` object.
-    """
-    # Create input layers
-    inputs = create_input_layers()
-
-    # transform raw features for both wide and deep
-    wide, deep = transform(inputs, nembeds)
-
-    # The Functional API in Keras requires: LayerConstructor()(inputs)
-    wide_inputs = tf.keras.layers.Concatenate()(wide.values())
-    deep_inputs = tf.keras.layers.Concatenate()(deep.values())
-
-    # Get output of model given inputs
-    output = get_model_outputs(wide_inputs, deep_inputs, dnn_hidden_units)
-
-    # Build model and compile it all together
-    model = tf.keras.models.Model(inputs=inputs, outputs=output)
-    model.compile(optimizer="adam", loss="mse", metrics=[rmse, "mse"])
-
-    return model
-
-
 # Instantiate the HyperTune reporting object
 hpt = hypertune.HyperTune()
+
 
 # Reporting callback
 class HPTCallback(tf.keras.callbacks.Callback):
@@ -199,34 +117,34 @@ class HPTCallback(tf.keras.callbacks.Callback):
 
 
 def train_and_evaluate(args):
-    model = build_wide_deep_model(args["nnsize"], args["nembeds"])
-    print("Here is our Wide-and-Deep architecture so far:\n")
+
+    training_images, one_hots_train = load_and_format_data_from_gcs(args["train_data_path"])
+    print(f"Maximum pixel value after normalization: {np.max(training_images)}\n")
+    print(f"Shape of training set after reshaping: {training_images.shape}\n")
+    print(f"Shape of one image after reshaping: {training_images[0].shape}")
+
+    valid_images, one_hots_valid = load_and_format_data_from_gcs(args["eval_data_path"])
+    print(f"Maximum pixel value after normalization: {np.max(valid_images)}\n")
+    print(f"Shape of training set after reshaping: {valid_images.shape}\n")
+    print(f"Shape of one image after reshaping: {valid_images[0].shape}")
+
+    model = convolutional_model(args["dropout_rate"], args["l2_regularization_lambda"],
+                                training_images_shape=training_images.shape[1:])
+    print("Here is our model so far:\n")
     print(model.summary())
 
-    trainds = load_dataset(
-        args["train_data_path"],
-        args["batch_size"],
-        tf.estimator.ModeKeys.TRAIN)
-
-    evalds = load_dataset(
-        args["eval_data_path"], 1000, tf.estimator.ModeKeys.EVAL)
-    if args["eval_steps"]:
-        evalds = evalds.take(count=args["eval_steps"])
-
-    num_batches = args["batch_size"] * args["num_epochs"]
-    steps_per_epoch = args["train_examples"] // num_batches
-
-    checkpoint_path = os.path.join(args["output_dir"], "checkpoints/babyweight")
+    checkpoint_path = os.path.join(args["output_dir"], "checkpoints/phase_contrast")
     cp_callback = tf.keras.callbacks.ModelCheckpoint(
         filepath=checkpoint_path, verbose=1, save_weights_only=True)
 
+    callbacks = myCallback()
+
     history = model.fit(
-        trainds,
-        validation_data=evalds,
+        x=training_images,
+        y=one_hots_train,
+        validation_data=(valid_images, one_hots_valid),
         epochs=args["num_epochs"],
-        steps_per_epoch=steps_per_epoch,
-        verbose=2,  # 0=silent, 1=progress bar, 2=one line per epoch
-        callbacks=[cp_callback, HPTCallback()])
+        callbacks=[callbacks, cp_callback, HPTCallback()])
 
     EXPORT_PATH = os.path.join(
         args["output_dir"], datetime.datetime.now().strftime("%Y%m%d%H%M%S"))
