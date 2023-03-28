@@ -111,8 +111,8 @@ class HPTCallback(tf.keras.callbacks.Callback):
     def on_epoch_end(self, epoch, logs=None):
         global hpt
         hpt.report_hyperparameter_tuning_metric(
-            hyperparameter_metric_tag='val_rmse',
-            metric_value=logs['val_rmse'],
+            hyperparameter_metric_tag='val_loss',
+            metric_value=logs['val_accuracy'],
             global_step=epoch)
 
 
