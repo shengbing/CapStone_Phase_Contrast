@@ -66,8 +66,8 @@ def create_pipeline():
             "container_spec": {
                 "image_uri": TRAINING_CONTAINER_IMAGE_URI,
                 "args": [
-                    f"--training_dataset_path={TRAINING_FILE_PATH}",
-                    f"--validation_dataset_path={VALIDATION_FILE_PATH}",
+                    f"--train_data_path={TRAINING_FILE_PATH}",
+                    f"--eval_data_path={VALIDATION_FILE_PATH}",
                     f"--output_dir={BASE_OUTPUT_DIR}",
                     "--hptune",
                 ],
@@ -125,8 +125,8 @@ def create_pipeline():
                 "container_spec": {
                     "image_uri": TRAINING_CONTAINER_IMAGE_URI,
                     "args": [
-                        f"--training_dataset_path={TRAINING_FILE_PATH}",
-                        f"--validation_dataset_path={VALIDATION_FILE_PATH}",
+                        f"--train_data_path={TRAINING_FILE_PATH}",
+                        f"--eval_data_path={VALIDATION_FILE_PATH}",
                         f"--output_dir={BASE_OUTPUT_DIR}",
                         "--nohptune",
                     ],
