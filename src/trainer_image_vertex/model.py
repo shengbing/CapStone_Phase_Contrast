@@ -56,6 +56,7 @@ def reshape_and_normalize(images):
 
 def load_and_format_data_from_gcs(sample_dir):
     # sample_dir="gs://capstone-datasets/train_3d.csv"
+    print(f"sample_dir: {sample_dir}")
     file_list = file_io.read_file_to_string(sample_dir).split("\n")
     images = np.array([np.load(BytesIO(file_io.read_file_to_string(file, binary_mode=True)))
                        for file in file_list if file])
