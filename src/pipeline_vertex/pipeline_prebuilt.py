@@ -84,7 +84,7 @@ def create_pipeline():
             "dropout_rate": hpt.DoubleParameterSpec(
                 min=1.0e-3, max=4.0e-1, scale="log"
             ),
-            "max_iter": hpt.DoubleParameterSpec(
+            "l2_regularization_lambda": hpt.DoubleParameterSpec(
                 min=1.0e-3, max=4.0e-1, scale="log"
             ),
         }
