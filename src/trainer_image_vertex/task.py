@@ -13,7 +13,7 @@ parent = os.path.dirname(current)
 # adding the parent directory to
 # the sys.path.
 sys.path.append(parent)
-from parent import model
+import model
 import tensorflow as tf
 
 if __name__ == "__main__":
