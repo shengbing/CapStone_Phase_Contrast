@@ -43,7 +43,7 @@ MAX_TRIAL_COUNT = int(os.getenv("MAX_TRIAL_COUNT", "5"))
 PARALLEL_TRIAL_COUNT = int(os.getenv("PARALLEL_TRIAL_COUNT", "5"))
 THRESHOLD = float(os.getenv("THRESHOLD", "0.6"))
 
-PIPELINE_NAME = os.getenv("PIPELINE_NAME", "ct_phase_contrast")
+PIPELINE_NAME = os.getenv("PIPELINE_NAME", "ct-phase-contrast")
 BASE_OUTPUT_DIR = os.getenv("BASE_OUTPUT_DIR", PIPELINE_ROOT)
 MODEL_DISPLAY_NAME = os.getenv("MODEL_DISPLAY_NAME", PIPELINE_NAME)
 
