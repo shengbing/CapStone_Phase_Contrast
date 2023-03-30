@@ -76,7 +76,7 @@ def create_pipeline():
     ]
 
     metric_spec = hyperparameter_tuning_job.serialize_metrics(
-        {"val_accuracy": "maximize"}
+        {"final_val_accuracy": "maximize"}
     )
 
     parameter_spec = hyperparameter_tuning_job.serialize_parameters(
