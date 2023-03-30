@@ -2,7 +2,7 @@ import argparse
 import json
 import os
 
-from trainer_image_vertex import model
+from parentdirectory import model
 
 import tensorflow as tf
 

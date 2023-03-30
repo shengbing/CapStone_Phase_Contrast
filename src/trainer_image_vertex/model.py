@@ -167,16 +167,14 @@ def train_and_evaluate(args):
 
     # Save the model
     if not hptune:
-        with open(MODEL_FILENAME, "wb") as model_file:
-            pickle.dump(model, model_file)
-        subprocess.check_call(
-            ["gsutil", "cp", MODEL_FILENAME, AIP_MODEL_DIR], stderr=sys.stdout
-        )
-        print(f"Saved model in: {AIP_MODEL_DIR}")
+        # with open(MODEL_FILENAME, "wb") as model_file:
+        #     pickle.dump(model, model_file)
+        # subprocess.check_call(
+        #     ["gsutil", "cp", MODEL_FILENAME, AIP_MODEL_DIR], stderr=sys.stdout
+        # )
+        # print(f"Saved model in: {AIP_MODEL_DIR}")
 
-    EXPORT_PATH = os.path.join(
-        args["output_dir"], datetime.datetime.now().strftime("%Y%m%d%H%M%S"))
-    tf.saved_model.save(
-        obj=model, export_dir=EXPORT_PATH)  # with default serving function
+        tf.saved_model.save(
+            obj=model, export_dir=AIP_MODEL_DIR)  # with default serving function
 
-    print("Exported trained model to {}".format(EXPORT_PATH))
+    print("Exported trained model to {}".format(AIP_MODEL_DIR))
