@@ -1,3 +1,4 @@
+import pprint
 import os
 import sys
 import pickle
@@ -20,6 +21,7 @@ from tensorflow.keras.layers import (
     Softmax
 )
 
+pp = pprint.PrettyPrinter(depth=8)
 AIP_MODEL_DIR = os.environ["AIP_MODEL_DIR"]
 MODEL_FILENAME = "model.pkl"
 
@@ -158,6 +160,7 @@ def train_and_evaluate(args):
     #  'val_sparse_categorical_accuracy': [0.9426000118255615, 0.9592999815940857]}
     hptune = args["hptune"]
     history_history = history.history
+    print(f"history_history: {pp.pformat(history_history)}")
     final_val_accuracy = history_history.get("val_accuracy")[-1]
     print(f"Final Validation accuracy: {final_val_accuracy}")
     if hptune:
