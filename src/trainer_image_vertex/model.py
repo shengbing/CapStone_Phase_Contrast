@@ -149,7 +149,7 @@ def train_and_evaluate(args):
         y=one_hots_train,
         validation_data=(valid_images, one_hots_valid),
         epochs=args["num_epochs"],
-        callbacks=[cp_callback, HPTCallback()])
+        callbacks=[callbacks, cp_callback, HPTCallback()])
 
     # history.history
     # {'loss': [0.3386789858341217, 0.1543138176202774],
