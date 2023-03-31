@@ -138,9 +138,9 @@ def train_and_evaluate(args):
     print("Here is our model so far:\n")
     print(model.summary())
 
-    checkpoint_path = os.path.join(args["output_dir"], "checkpoints/phase_contrast")
+    # checkpoint_path = os.path.join(args["output_dir"], "checkpoints/phase_contrast")
     cp_callback = tf.keras.callbacks.ModelCheckpoint(
-        filepath=checkpoint_path, verbose=1, save_weights_only=True)
+        filepath=AIP_MODEL_DIR, verbose=1, save_weights_only=True)
 
     callbacks = myCallback()
 
@@ -149,7 +149,7 @@ def train_and_evaluate(args):
         y=one_hots_train,
         validation_data=(valid_images, one_hots_valid),
         epochs=args["num_epochs"],
-        callbacks=[HPTCallback()])
+        callbacks=[cp_callback, HPTCallback()])
 
     # history.history
     # {'loss': [0.3386789858341217, 0.1543138176202774],
